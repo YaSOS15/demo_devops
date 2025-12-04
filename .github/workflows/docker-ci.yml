@@ -2,7 +2,8 @@ name: Build, Push image & Test (no local Docker needed)
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -12,8 +13,7 @@ permissions:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    outputs:
-      image_ref: ${{ steps.build.outputs.image }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -41,11 +41,11 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ github.sha }}
-          outputs: type=image,push=true
 
   test-image:
     needs: build-and-push
     runs-on: ubuntu-latest
+
     steps:
       - name: Pull the image we just pushed
         run: |
@@ -56,12 +56,9 @@ jobs:
       - name: Run container for health check (in Actions runner)
         run: |
           IMAGE=ghcr.io/${{ github.repository }}:latest
-          # run container in detached mode, map to a free port 8080 on runner
           PORT=8080
           docker run -d --name tmp_site -p ${PORT}:80 $IMAGE
-          # wait for server to start
           sleep 3
-          # check HTTP status code
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ || true)
           echo "HTTP code: $HTTP_CODE"
           if [ "$HTTP_CODE" -ne 200 ]; then
@@ -75,11 +72,11 @@ jobs:
           docker stop tmp_site || true
           docker rm tmp_site || true
 
-  # Optional: push image to production server (requires server Docker)
   deploy-to-server:
+    if: github.ref == 'refs/heads/main'
     needs: test-image
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+
     steps:
       - name: Setup SSH key
         uses: webfactory/ssh-agent@v0.7.0
