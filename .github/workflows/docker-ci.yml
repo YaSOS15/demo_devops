@@ -1,0 +1,102 @@
+name: Build, Push image & Test (no local Docker needed)
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image_ref: ${{ steps.build.outputs.image }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (optional, multi-arch)
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+          outputs: type=image,push=true
+
+  test-image:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull the image we just pushed
+        run: |
+          IMAGE=ghcr.io/${{ github.repository }}:latest
+          echo "Image: $IMAGE"
+          docker pull $IMAGE
+
+      - name: Run container for health check (in Actions runner)
+        run: |
+          IMAGE=ghcr.io/${{ github.repository }}:latest
+          # run container in detached mode, map to a free port 8080 on runner
+          PORT=8080
+          docker run -d --name tmp_site -p ${PORT}:80 $IMAGE
+          # wait for server to start
+          sleep 3
+          # check HTTP status code
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ || true)
+          echo "HTTP code: $HTTP_CODE"
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            docker logs tmp_site || true
+            docker stop tmp_site || true
+            docker rm tmp_site || true
+            echo "Health check failed (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+          echo "Health check passed"
+          docker stop tmp_site || true
+          docker rm tmp_site || true
+
+  # Optional: push image to production server (requires server Docker)
+  deploy-to-server:
+    needs: test-image
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy: pull image & restart container on remote server
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}:latest
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          PORT=${SSH_PORT:-22}
+          echo "Deploying $IMAGE to $SSH_USER@$SSH_HOST"
+          ssh -o StrictHostKeyChecking=no -p $PORT $SSH_USER@$SSH_HOST \
+            "docker pull $IMAGE && \
+             docker stop site_static || true && \
+             docker rm site_static || true && \
+             docker run -d --name site_static -p 80:80 --restart always $IMAGE"
