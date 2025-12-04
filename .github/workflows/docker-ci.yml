@@ -42,6 +42,7 @@ jobs:
             ghcr.io/yasos15/demo_devops:latest
             ghcr.io/yasos15/demo_devops:${{ github.sha }}
 
+
   test-image:
     needs: build-and-push
     runs-on: ubuntu-latest
@@ -49,13 +50,13 @@ jobs:
     steps:
       - name: Pull the image we just pushed
         run: |
-          IMAGE=ghcr.io/yasos15/demo_devops:latest
+          IMAGE=ghcr.io/${{ github.repository }}:latest
           echo "Image: $IMAGE"
           docker pull $IMAGE
 
       - name: Run container for health check (in Actions runner)
         run: |
-          IMAGE=ghcr.io/yasos15/demo_devops:latest
+          IMAGE=ghcr.io/${{ github.repository }}:latest
           PORT=8080
           docker run -d --name tmp_site -p ${PORT}:80 $IMAGE
           sleep 3
@@ -85,7 +86,7 @@ jobs:
 
       - name: Deploy pull image & restart container on remote server
         env:
-          IMAGE: ghcr.io/yasos15/demo_devops:latest
+          IMAGE: ghcr.io/${{ github.repository }}:latest
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PORT: ${{ secrets.SSH_PORT }}
