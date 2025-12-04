@@ -39,8 +39,9 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/yasos15/demo_devops:latest
+            ghcr.io/yasos15/demo_devops:${{ github.sha }}
+
 
   test-image:
     needs: build-and-push
