@@ -1,0 +1,73 @@
+name: Build, Push image & Test (no local Docker)
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ghcr.io/yasos15/demo_devops:latest
+            ghcr.io/yasos15/demo_devops:${{ github.sha }}
+
+  test-image:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull the image we just pushed
+        run: |
+          IMAGE=ghcr.io/yasos15/demo_devops:latest
+          echo "Image: $IMAGE"
+          docker pull $IMAGE
+
+      - name: Run container for health check (in Actions runner)
+        run: |
+          set -euo pipefail
+          IMAGE=ghcr.io/yasos15/demo_devops:latest
+          PORT=8080
+          docker run -d --name tmp_site -p ${PORT}:80 $IMAGE
+          sleep 5
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${PORT}/ || true)
+          echo "HTTP code: $HTTP_CODE"
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "Health check failed, dumping container logs:"
+            docker logs tmp_site || true
+            docker ps -a || true
+            docker stop tmp_site || true
+            docker rm tmp_site || true
+            exit 1
+          fi
+          echo "Health check passed"
+          docker stop tmp_site || true
+          docker rm tmp_site || true
