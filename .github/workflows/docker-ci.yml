@@ -37,8 +37,8 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            Soso/demo_devops:latest
-            Soso/demo_devops:${{ github.sha }}
+            soso/demo_devops:latest
+            soso/demo_devops:${{ github.sha }}
 
   test-image:
     needs: build-and-push
@@ -52,14 +52,14 @@ jobs:
 
       - name: Pull the image we just pushed
         run: |
-          IMAGE=Soso/demo_devops:latest
+          IMAGE=soso/demo_devops:latest
           echo "Image: $IMAGE"
           docker pull $IMAGE
 
       - name: Run container for health check (in Actions runner)
         run: |
           set -euo pipefail
-          IMAGE=Soso/demo_devops:latest
+          IMAGE=soso/demo_devops:latest
           PORT=8080
           docker run -d --name tmp_site -p ${PORT}:80 $IMAGE
           sleep 5
