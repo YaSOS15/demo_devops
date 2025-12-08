@@ -1,13 +1,12 @@
-name: Terraform CI
+name: Terraform fmt / validate / plan
 
-# Déclenche sur push vers main et sur pull request (PR)
 on:
   push:
     branches:
       - main
   pull_request:
     branches:
-      - formulaire
+      - main
 
 permissions:
   contents: read
@@ -26,41 +25,80 @@ jobs:
         with:
           terraform_version: 1.5.0
 
-      - name: Terraform fmt (check)
-        # vérifie que le code est formaté ; échoue si non
-        run: |
-          # recherche tous les dossiers terraform (optionnel : adapte le chemin si ton dossier s'appelle infra/)
-          for d in $(find . -maxdepth 2 -type d -name "infra" -or -name "terraform" -or -name "terraform*"); do
-            echo "Checking terraform fmt in $d"
-            terraform -chdir="$d" fmt -check -recursive || exit 1
-          done
-
-      - name: Terraform init (per-folder)
+      - name: Terraform fmt (check) for known dirs
         run: |
           set -euo pipefail
-          for d in $(find . -maxdepth 2 -type d -name "infra" -or -name "terraform" -or -name "terraform*"); do
-            echo "Init in $d"
-            terraform -chdir="$d" init -input=false
+          # liste explicite des dossiers possibles (ajoute d'autres chemins si besoin)
+          CANDIDATES="./terraform ./infra ./terraform-*"
+          FOUND=0
+          for d in $CANDIDATES; do
+            # shell globbing -> transforme en rien si aucun match
+            for real in $d; do
+              [ -z "$real" ] && continue
+              if [ -d "$real" ]; then
+                FOUND=1
+                echo "Checking terraform fmt in $real"
+                terraform -chdir="$real" fmt -check -recursive
+              else
+                echo "Skip $real (not a directory)"
+              fi
+            done
           done
+          if [ "$FOUND" -eq 0 ]; then
+            echo "No terraform directories found among candidates: $CANDIDATES"
+            exit 0
+          fi
 
-      - name: Terraform validate
+      - name: Terraform init (per-folder known)
         run: |
           set -euo pipefail
-          for d in $(find . -maxdepth 2 -type d -name "infra" -or -name "terraform" -or -name "terraform*"); do
-            echo "Validate in $d"
-            terraform -chdir="$d" validate
+          CANDIDATES="./terraform ./infra ./terraform-*"
+          for d in $CANDIDATES; do
+            for real in $d; do
+              [ -z "$real" ] && continue
+              if [ -d "$real" ]; then
+                echo "Init in $real"
+                terraform -chdir="$real" init -input=false
+              else
+                echo "Skip init $real (not a directory)"
+              fi
+            done
+          done
+
+      - name: Terraform validate (per-folder known)
+        run: |
+          set -euo pipefail
+          CANDIDATES="./terraform ./infra ./terraform-*"
+          for d in $CANDIDATES; do
+            for real in $d; do
+              [ -z "$real" ] && continue
+              if [ -d "$real" ]; then
+                echo "Validate in $real"
+                terraform -chdir="$real" validate
+              else
+                echo "Skip validate $real (not a directory)"
+              fi
+            done
           done
 
       - name: Terraform plan (create plan files)
         run: |
           set -euo pipefail
           mkdir -p .tfplans
-          for d in $(find . -maxdepth 2 -type d -name "infra" -or -name "terraform" -or -name "terraform*"); do
-            echo "Plan in $d"
-            # crée un plan binaire pour examen ultérieur
-            terraform -chdir="$d" plan -input=false -out=".tfplans/$(echo $d | tr '/' '_').tfplan"
-            # crée aussi une version lisible en texte pour lecture rapide
-            terraform -chdir="$d" show -no-color ".tfplans/$(echo $d | tr '/' '_').tfplan" > ".tfplans/$(echo $d | tr '/' '_').plan.txt" || true
+          CANDIDATES="./terraform ./infra ./terraform-*"
+          for d in $CANDIDATES; do
+            for real in $d; do
+              [ -z "$real" ] && continue
+              if [ -d "$real" ]; then
+                NAME=$(echo "$real" | tr '/' '_' | sed 's/^\._//')
+                PLAN_NAME=".tfplans/${NAME}.tfplan"
+                echo "Plan in $real -> $PLAN_NAME"
+                terraform -chdir="$real" plan -input=false -out="$PLAN_NAME"
+                terraform -chdir="$real" show -no-color "$PLAN_NAME" > "${PLAN_NAME}.txt" || true
+              else
+                echo "Skip plan $real (not a directory)"
+              fi
+            done
           done
 
       - name: Upload terraform plans (artifact)
