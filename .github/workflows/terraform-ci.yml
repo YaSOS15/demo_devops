@@ -1,0 +1,70 @@
+name: Terraform CI
+
+# Déclenche sur push vers main et sur pull request (PR)
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - formulaire
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    name: Terraform fmt / validate / plan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Terraform fmt (check)
+        # vérifie que le code est formaté ; échoue si non
+        run: |
+          # recherche tous les dossiers terraform (optionnel : adapte le chemin si ton dossier s'appelle infra/)
+          for d in $(find . -maxdepth 2 -type d -name "infra" -or -name "terraform" -or -name "terraform*"); do
+            echo "Checking terraform fmt in $d"
+            terraform -chdir="$d" fmt -check -recursive || exit 1
+          done
+
+      - name: Terraform init (per-folder)
+        run: |
+          set -euo pipefail
+          for d in $(find . -maxdepth 2 -type d -name "infra" -or -name "terraform" -or -name "terraform*"); do
+            echo "Init in $d"
+            terraform -chdir="$d" init -input=false
+          done
+
+      - name: Terraform validate
+        run: |
+          set -euo pipefail
+          for d in $(find . -maxdepth 2 -type d -name "infra" -or -name "terraform" -or -name "terraform*"); do
+            echo "Validate in $d"
+            terraform -chdir="$d" validate
+          done
+
+      - name: Terraform plan (create plan files)
+        run: |
+          set -euo pipefail
+          mkdir -p .tfplans
+          for d in $(find . -maxdepth 2 -type d -name "infra" -or -name "terraform" -or -name "terraform*"); do
+            echo "Plan in $d"
+            # crée un plan binaire pour examen ultérieur
+            terraform -chdir="$d" plan -input=false -out=".tfplans/$(echo $d | tr '/' '_').tfplan"
+            # crée aussi une version lisible en texte pour lecture rapide
+            terraform -chdir="$d" show -no-color ".tfplans/$(echo $d | tr '/' '_').tfplan" > ".tfplans/$(echo $d | tr '/' '_').plan.txt" || true
+          done
+
+      - name: Upload terraform plans (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plans
+          path: .tfplans/
