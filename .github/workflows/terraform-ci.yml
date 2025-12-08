@@ -1,13 +1,12 @@
-name: Terraform CI
+name: Terraform fmt / valider / planifier
 
-# Déclenche sur push vers main et sur pull request (PR)
 on:
   push:
     branches:
       - main
   pull_request:
     branches:
-      - formulaire
+      - main
 
 permissions:
   contents: read
@@ -26,42 +25,118 @@ jobs:
         with:
           terraform_version: 1.5.0
 
-      - name: Terraform fmt (check)
-        # vérifie que le code est formaté ; échoue si non
+      - name: Find terraform directories
+        id: tfdirs
         run: |
-          # recherche tous les dossiers terraform (optionnel : adapte le chemin si ton dossier s'appelle infra/)
-          for d in $(find . -maxdepth 2 -type d -name "infra" -or -name "terraform" -or -name "terraform*"); do
+          # on cherche les dossiers appelés "infra", "terraform", ou commençant par "terraform"
+          # et on les liste ligne par ligne dans l'output GITHUB_OUTPUT
+          echo "dirs=" >> $GITHUB_OUTPUT
+          DIRS=$(find . -maxdepth 2 -type d \( -name "infra" -o -name "terraform" -o -name "terraform*" \) -print)
+          if [ -z "$DIRS" ]; then
+            echo "No terraform directories found."
+            echo "dirs=" >> $GITHUB_OUTPUT
+          else
+            # transforme en une seule ligne séparée par des espaces (ou change si besoin)
+            # et échappe les nouvelles lignes correctement
+            echo "dirs<<EOF" >> $GITHUB_OUTPUT
+            echo "$DIRS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Terraform fmt (check) for each directory
+        run: |
+          set -euo pipefail
+          # lire la variable depuis l'étape précédente
+          mapfile -t DIRS_ARRAY < <(echo "$DIRS" | sed -n '1,$p')
+          # si variable GITHUB_OUTPUT fournie, fallback to reading via jq-style read:
+          # on utilise la variable d'environnement fournie par GitHub Actions
+          if [ -n "${{ steps.tfdirs.outputs.dirs }}" ]; then
+            DIRS_RAW="${{ steps.tfdirs.outputs.dirs }}"
+          else
+            DIRS_RAW=""
+          fi
+          # use DIRS_RAW; if empty, try reading DIRS_ARRAY from find
+          if [ -z "$DIRS_RAW" ]; then
+            DIRS_LIST=$(find . -maxdepth 2 -type d \( -name "infra" -o -name "terraform" -o -name "terraform*" \) -print)
+          else
+            DIRS_LIST="$DIRS_RAW"
+          fi
+
+          if [ -z "$DIRS_LIST" ]; then
+            echo "No terraform directories to check."
+            exit 0
+          fi
+
+          echo "Terraform directories found:"
+          echo "$DIRS_LIST"
+
+          while IFS= read -r d; do
+            # ignore empty lines
+            [ -z "$d" ] && continue
             echo "Checking terraform fmt in $d"
-            terraform -chdir="$d" fmt -check -recursive || exit 1
-          done
+            if [ -d "$d" ]; then
+              terraform -chdir="$d" fmt -check -recursive
+            else
+              echo "Skipping $d (not a directory)"
+            fi
+          done <<< "$DIRS_LIST"
 
       - name: Terraform init (per-folder)
         run: |
           set -euo pipefail
-          for d in $(find . -maxdepth 2 -type d -name "infra" -or -name "terraform" -or -name "terraform*"); do
-            echo "Init in $d"
-            terraform -chdir="$d" init -input=false
-          done
+          DIRS=$(find . -maxdepth 2 -type d \( -name "infra" -o -name "terraform" -o -name "terraform*" \) -print)
+          if [ -z "$DIRS" ]; then
+            echo "No terraform directories found."
+            exit 0
+          fi
+          while IFS= read -r d; do
+            [ -z "$d" ] && continue
+            if [ -d "$d" ]; then
+              echo "Init in $d"
+              terraform -chdir="$d" init -input=false
+            else
+              echo "Skip init $d (not a dir)"
+            fi
+          done <<< "$DIRS"
 
-      - name: Terraform validate
+      - name: Terraform validate (per-folder)
         run: |
           set -euo pipefail
-          for d in $(find . -maxdepth 2 -type d -name "infra" -or -name "terraform" -or -name "terraform*"); do
-            echo "Validate in $d"
-            terraform -chdir="$d" validate
-          done
+          DIRS=$(find . -maxdepth 2 -type d \( -name "infra" -o -name "terraform" -o -name "terraform*" \) -print)
+          if [ -z "$DIRS" ]; then
+            echo "No terraform directories found."
+            exit 0
+          fi
+          while IFS= read -r d; do
+            [ -z "$d" ] && continue
+            if [ -d "$d" ]; then
+              echo "Validate in $d"
+              terraform -chdir="$d" validate
+            else
+              echo "Skip validate $d (not a dir)"
+            fi
+          done <<< "$DIRS"
 
       - name: Terraform plan (create plan files)
         run: |
           set -euo pipefail
           mkdir -p .tfplans
-          for d in $(find . -maxdepth 2 -type d -name "infra" -or -name "terraform" -or -name "terraform*"); do
-            echo "Plan in $d"
-            # crée un plan binaire pour examen ultérieur
-            terraform -chdir="$d" plan -input=false -out=".tfplans/$(echo $d | tr '/' '_').tfplan"
-            # crée aussi une version lisible en texte pour lecture rapide
-            terraform -chdir="$d" show -no-color ".tfplans/$(echo $d | tr '/' '_').tfplan" > ".tfplans/$(echo $d | tr '/' '_').plan.txt" || true
-          done
+          DIRS=$(find . -maxdepth 2 -type d \( -name "infra" -o -name "terraform" -o -name "terraform*" \) -print)
+          if [ -z "$DIRS" ]; then
+            echo "No terraform directories found."
+            exit 0
+          fi
+          while IFS= read -r d; do
+            [ -z "$d" ] && continue
+            if [ -d "$d" ]; then
+              PLAN_NAME=".tfplans/$(echo $d | tr '/' '_' | sed 's/^\._//').tfplan"
+              echo "Plan in $d -> $PLAN_NAME"
+              terraform -chdir="$d" plan -input=false -out="$PLAN_NAME"
+              terraform -chdir="$d" show -no-color "$PLAN_NAME" > "$PLAN_NAME.txt" || true
+            else
+              echo "Skip plan $d (not a dir)"
+            fi
+          done <<< "$DIRS"
 
       - name: Upload terraform plans (artifact)
         uses: actions/upload-artifact@v4
