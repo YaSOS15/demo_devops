@@ -1,9 +1,300 @@
-<!DOCTYPE html> 
-<html> 
-<head> 
-<title>Test DevOps</title> 
-</head> 
-<body> 
-<h1>Bienvenue dans le pipeline DevOps, soso yasos</h1> 
-</body> 
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Formulaire Moderne</title>
+  <style>
+    :root{
+      --bg1: #0f172a;
+      --bg2: #0b1220;
+      --card: rgba(255,255,255,0.06);
+      --accent: linear-gradient(135deg,#7c3aed,#06b6d4);
+      --glass: rgba(255,255,255,0.04);
+      --text: #e6eef8;
+      --muted: #9fb2c8;
+      --success: #16a34a;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    html,body{height:100%;}
+    body{
+      margin:0;display:grid;place-items:center;min-height:100vh;padding:2rem;
+      background:radial-gradient(1000px 600px at 10% 10%, rgba(124,58,237,0.12), transparent),
+                 radial-gradient(900px 500px at 95% 90%, rgba(6,182,212,0.08), transparent),
+                 linear-gradient(180deg,var(--bg1),var(--bg2));
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+
+    .card{
+      width:100%;max-width:820px;background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+      border-radius:16px;padding:28px;box-shadow:0 10px 30px rgba(2,6,23,0.6);backdrop-filter: blur(8px);
+      border:1px solid rgba(255,255,255,0.04);display:grid;grid-template-columns:1fr 420px;gap:20px;align-items:center;
+    }
+
+    @media (max-width:900px){
+      .card{grid-template-columns:1fr;}
+    }
+
+    .brand{
+      display:flex;align-items:center;gap:14px;margin-bottom:6px
+    }
+    .logo{
+      width:54px;height:54px;border-radius:12px;background:var(--accent);display:grid;place-items:center;font-weight:700;color:white;font-size:18px;box-shadow:0 6px 18px rgba(124,58,237,0.18);
+    }
+    h1{margin:0;font-size:20px}
+    p.lead{margin:6px 0 20px;color:var(--muted);font-size:14px}
+
+    form{display:grid;gap:12px}
+
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media (max-width:560px){.grid-2{grid-template-columns:1fr}}
+
+    .field{
+      position:relative;display:flex;flex-direction:column;gap:6px
+    }
+    .input, .textarea, .select{
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);outline:none;color:var(--text);font-size:14px;transition:box-shadow .18s, transform .12s, border-color .12s
+    }
+    .input:focus, .textarea:focus, .select:focus{
+      box-shadow:0 6px 20px rgba(12,31,63,0.45), 0 0 0 4px rgba(124,58,237,0.08);
+      border-color: rgba(124,58,237,0.6);transform:translateY(-1px)
+    }
+
+    label.small{font-size:12px;color:var(--muted)}
+
+    .textarea{min-height:110px;resize:vertical}
+
+    .meta{
+      display:flex;justify-content:space-between;align-items:center;margin-top:6px;color:var(--muted);font-size:13px
+    }
+
+    .btn{
+      display:inline-flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:0;background:var(--accent);color:white;font-weight:600;cursor:pointer;box-shadow:0 8px 20px rgba(12,31,63,0.5);transition:transform .14s,box-shadow .14s
+    }
+    .btn:active{transform:translateY(1px)}
+
+    .right-panel{padding:8px 12px;border-left:1px solid rgba(255,255,255,0.02)}
+    @media (max-width:900px){.right-panel{border-left:0;border-top:1px solid rgba(255,255,255,0.02)}}
+
+    .preview{
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:18px;border-radius:12px;min-height:200px;display:flex;flex-direction:column;gap:8px;justify-content:center;align-items:center
+    }
+    .pill{padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.03);font-size:13px;color:var(--muted)}
+
+    .success{display:none;gap:12px;align-items:center;padding:12px 14px;border-radius:10px;background:linear-gradient(90deg, rgba(16,185,129,0.12), rgba(16,185,129,0.06));color:var(--success);border:1px solid rgba(16,185,129,0.12)}
+
+    .error{color:#fb7185;font-size:13px;margin-top:6px}
+
+    .charcount{font-size:12px;color:var(--muted)}
+
+    footer.note{margin-top:12px;color:var(--muted);font-size:13px;text-align:center}
+
+  </style>
+</head>
+<body>
+  <div class="card" role="region" aria-label="Formulaire moderne">
+    <div style="padding-right:6px">
+      <div class="brand">
+        <div class="logo">FM</div>
+        <div>
+          <h1>Formulaire Moderne</h1>
+          <p class="lead">Un formulaire élégant, centré et dynamique — validations en direct et retour visuel.</p>
+        </div>
+      </div>
+
+      <form id="contactForm" autocomplete="on" novalidate>
+        <div class="grid-2">
+          <div class="field">
+            <label class="small" for="prenom">Prénom *</label>
+            <input id="prenom" class="input" name="prenom" type="text" placeholder="Ex: Amina" required minlength="2" />
+            <div class="error" data-for="prenom"></div>
+          </div>
+
+          <div class="field">
+            <label class="small" for="nom">Nom *</label>
+            <input id="nom" class="input" name="nom" type="text" placeholder="Ex: Ngou" required minlength="2" />
+            <div class="error" data-for="nom"></div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label class="small" for="email">Email *</label>
+            <input id="email" class="input" name="email" type="email" placeholder="prenom@exemple.com" required />
+            <div class="error" data-for="email"></div>
+          </div>
+
+          <div class="field">
+            <label class="small" for="telephone">Téléphone</label>
+            <input id="telephone" class="input" name="telephone" type="tel" placeholder="+241 0X XX XX XX" pattern="[0-9+\s-]{6,20}" />
+            <div class="error" data-for="telephone"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="small" for="sujet">Sujet *</label>
+          <select id="sujet" class="select" name="sujet" required>
+            <option value="">-- Choisir un sujet --</option>
+            <option>Demande d'information</option>
+            <option>Inscription</option>
+            <option>Partenariat</option>
+            <option>Autre</option>
+          </select>
+          <div class="error" data-for="sujet"></div>
+        </div>
+
+        <div class="field">
+          <label class="small" for="message">Message *</label>
+          <textarea id="message" class="textarea" name="message" maxlength="800" placeholder="Écrivez votre message..." required></textarea>
+          <div class="meta"><span class="charcount" id="chars">0 / 800</span><span class="pill">Nous répondons sous 48h</span></div>
+          <div class="error" data-for="message"></div>
+        </div>
+
+        <div style="display:flex;gap:12px;margin-top:8px;align-items:center">
+          <button type="submit" class="btn">Envoyer</button>
+          <div class="success" id="successBox" role="status">✓ Message envoyé — merci !</div>
+        </div>
+
+      </form>
+
+      <footer class="note">Formulaire demo — modifiez les champs / styles facilement.</footer>
+    </div>
+
+    <aside class="right-panel">
+      <div class="preview">
+        <div style="text-align:center">
+          <strong>Résumé en direct</strong>
+          <div style="height:8px"></div>
+          <div id="previewName" style="font-size:15px;color:var(--text)">— Prénom Nom —</div>
+          <div id="previewEmail" style="font-size:13px;color:var(--muted)">— email@example.com —</div>
+        </div>
+
+        <div style="width:100%;text-align:center;margin-top:6px">
+          <small class="pill">Sujet: <span id="previewSujet">—</span></small>
+        </div>
+
+        <div style="width:100%;text-align:center;margin-top:12px">
+          <small id="previewSnippet" style="color:var(--muted)">Aperçu du message...</small>
+        </div>
+
+      </div>
+
+      <div style="margin-top:14px;display:flex;gap:10px;flex-direction:column">
+        <div class="pill">Validation en direct</div>
+        <div class="pill">Compteur de caractères</div>
+        <div class="pill">Design responsive</div>
+      </div>
+
+    </aside>
+  </div>
+
+  <script>
+    // Références
+    const form = document.getElementById('contactForm');
+    const successBox = document.getElementById('successBox');
+    const chars = document.getElementById('chars');
+    const message = document.getElementById('message');
+
+    // Preview elements
+    const previewName = document.getElementById('previewName');
+    const previewEmail = document.getElementById('previewEmail');
+    const previewSujet = document.getElementById('previewSujet');
+    const previewSnippet = document.getElementById('previewSnippet');
+
+    // Fields
+    const prenom = document.getElementById('prenom');
+    const nom = document.getElementById('nom');
+    const email = document.getElementById('email');
+    const telephone = document.getElementById('telephone');
+    const sujet = document.getElementById('sujet');
+
+    // Helper: show error under field
+    function showError(fieldName, text){
+      const el = document.querySelector('.error[data-for="'+fieldName+'"]');
+      if(!el) return;
+      el.textContent = text || '';
+    }
+
+    // Validation simple
+    function validateField(el){
+      const val = el.value.trim();
+      if(el.required && !val){
+        showError(el.id, 'Ce champ est requis.');
+        return false;
+      }
+      if(el.minLength && val.length < el.minLength){
+        showError(el.id, `Doit contenir au moins ${el.minLength} caractères.`);
+        return false;
+      }
+      if(el.type === 'email' && val){
+        const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+        if(!ok){ showError(el.id, 'Adresse email invalide.'); return false; }
+      }
+      if(el.pattern && val){
+        const re = new RegExp(el.pattern);
+        if(!re.test(val)){ showError(el.id, 'Format invalide.'); return false; }
+      }
+      showError(el.id, '');
+      return true;
+    }
+
+    // Real-time preview + validation
+    [prenom,nom,email,telephone,sujet,message].forEach(el=>{
+      el.addEventListener('input', e=>{
+        validateField(el);
+        updatePreview();
+        if(el === message){
+          chars.textContent = `${el.value.length} / ${el.maxLength}`;
+        }
+      });
+    });
+
+    function updatePreview(){
+      const p = prenom.value.trim() || '—';
+      const n = nom.value.trim() || '—';
+      previewName.textContent = p === '—' && n === '—' ? '— Prénom Nom —' : `${p} ${n}`.trim();
+      previewEmail.textContent = email.value.trim() || '— email@example.com —';
+      previewSujet.textContent = sujet.value || '—';
+      const text = message.value.trim();
+      previewSnippet.textContent = text ? (text.length>90 ? text.slice(0,90)+'…' : text) : 'Aperçu du message...';
+    }
+
+    // Submit handling (demo)
+    form.addEventListener('submit', e=>{
+      e.preventDefault();
+      // Validate all
+      const fields = [prenom,nom,email,sujet,message];
+      let ok = true;
+      fields.forEach(f=>{ if(!validateField(f)) ok=false; });
+      if(!ok) {
+        // focus first invalid
+        const first = document.querySelector('.error:not(:empty)');
+        if(first){
+          const id = first.getAttribute('data-for');
+          document.getElementById(id).focus();
+        }
+        return;
+      }
+
+      // Simulate send
+      successBox.style.display = 'inline-flex';
+      successBox.animate([{opacity:0, transform:'translateY(-6px)'},{opacity:1, transform:'translateY(0)'}],{duration:360,easing:'cubic-bezier(.17,.84,.44,1)'});
+
+      // Clear form after a short delay to show success
+      setTimeout(()=>{
+        form.reset();
+        chars.textContent = `0 / ${message.maxLength}`;
+        updatePreview();
+        // Hide success after 3.2s
+        setTimeout(()=>{ successBox.style.display = 'none'; },3200);
+      },700);
+    });
+
+    // Initial update
+    updatePreview();
+  </script>
+</body>
 </html>
