@@ -25,14 +25,15 @@ jobs:
         with:
           terraform_version: 1.5.0
 
+      # ---------------------------
+      # Terraform FMT
+      # ---------------------------
       - name: Terraform fmt (check) for known dirs
         run: |
           set -euo pipefail
-          # liste explicite des dossiers possibles (ajoute d'autres chemins si besoin)
           CANDIDATES="./terraform ./infra ./terraform-*"
           FOUND=0
           for d in $CANDIDATES; do
-            # shell globbing -> transforme en rien si aucun match
             for real in $d; do
               [ -z "$real" ] && continue
               if [ -d "$real" ]; then
@@ -44,15 +45,20 @@ jobs:
               fi
             done
           done
+
           if [ "$FOUND" -eq 0 ]; then
-            echo "No terraform directories found among candidates: $CANDIDATES"
+            echo "No terraform directories found. Candidate paths: $CANDIDATES"
             exit 0
           fi
 
-      - name: Terraform init (per-folder known)
+      # ---------------------------
+      # Terraform INIT
+      # ---------------------------
+      - name: Terraform init (per-folder)
         run: |
           set -euo pipefail
           CANDIDATES="./terraform ./infra ./terraform-*"
+
           for d in $CANDIDATES; do
             for real in $d; do
               [ -z "$real" ] && continue
@@ -65,10 +71,14 @@ jobs:
             done
           done
 
-      - name: Terraform validate (per-folder known)
+      # ---------------------------
+      # Terraform VALIDATE
+      # ---------------------------
+      - name: Terraform validate (per-folder)
         run: |
           set -euo pipefail
           CANDIDATES="./terraform ./infra ./terraform-*"
+
           for d in $CANDIDATES; do
             for real in $d; do
               [ -z "$real" ] && continue
@@ -81,27 +91,61 @@ jobs:
             done
           done
 
-      - name: Terraform plan (create plan files)
+      # ---------------------------
+      # Terraform PLAN (robuste)
+      # ---------------------------
+      - name: Terraform plan (create plan files) - robust
         run: |
           set -euo pipefail
           mkdir -p .tfplans
           CANDIDATES="./terraform ./infra ./terraform-*"
+
           for d in $CANDIDATES; do
             for real in $d; do
               [ -z "$real" ] && continue
+
               if [ -d "$real" ]; then
+                echo "==> Planning in $real"
+
+                # Vérifier/init
+                terraform -chdir="$real" init -input=false || {
+                  echo "ERROR: terraform init failed in $real"
+                  ls -la "$real"
+                  exit 1
+                }
+
                 NAME=$(echo "$real" | tr '/' '_' | sed 's/^\._//')
-                PLAN_NAME=".tfplans/${NAME}.tfplan"
-                echo "Plan in $real -> $PLAN_NAME"
-                terraform -chdir="$real" plan -input=false -out="$PLAN_NAME"
-                terraform -chdir="$real" show -no-color "$PLAN_NAME" > "${PLAN_NAME}.txt" || true
+                TMP_PLAN="/tmp/${NAME}.tfplan"
+                LOCAL_PLAN=".tfplans/${NAME}.tfplan"
+
+                echo "Plan -> $TMP_PLAN"
+
+                if terraform -chdir="$real" plan -input=false -out="$TMP_PLAN"; then
+                  # Version lisible
+                  terraform -chdir="$real" show -no-color "$TMP_PLAN" > "${LOCAL_PLAN}.txt" || true
+                  cp "$TMP_PLAN" "$LOCAL_PLAN" || true
+
+                  echo "Plan written to:"
+                  echo "  - $LOCAL_PLAN"
+                  echo "  - ${LOCAL_PLAN}.txt"
+
+                else
+                  echo "ERROR: terraform plan failed in $real"
+                  ls -la "$real"
+                  ls -la "$real/.terraform" || true
+                  exit 1
+                fi
+
               else
                 echo "Skip plan $real (not a directory)"
               fi
             done
           done
 
-      - name: Upload terraform plans (artifact)
+      # ---------------------------
+      # Upload des plans Terraform
+      # ---------------------------
+      - name: Upload Terraform plans
         uses: actions/upload-artifact@v4
         with:
           name: terraform-plans
